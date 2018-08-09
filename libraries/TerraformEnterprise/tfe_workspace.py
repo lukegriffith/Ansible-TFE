@@ -61,26 +61,27 @@ message:
 
 from requests import Request
 import requests
+import json
 
 class api():
     def __init__(self, token, workspace_name, organization, **kwargs):
+
         self.token = token
         self.workspace_name = workspace_name
         self.kwargs = kwargs
         self.url = 'https://app.terraform.io/api/v2/organizations/{}/workspaces'.format(organization)
 
         self.headers =  {
-            'Authorization': 'Bearer {}'.format(self.token)
+            'Authorization': 'Bearer {}'.format(self.token),
+            'content-type': 'application/vnd.api+json'
         }
 
-        self.format_post_payload()
 
     def format_post_payload(self):
-        
 
         self.post_payload = {
             'data': {
-                'type': 'workspace',
+                'type': 'workspaces',
                 'attributes': {
                     'name': self.workspace_name
                 }
@@ -109,11 +110,10 @@ class api():
 
     def create_workspace(self):
 
-        data = self.post_payload
+        self.format_post_payload()
+        r = requests.post(self.url, data=json.dumps(self.post_payload), headers=self.headers)   
 
-        r = Request('POST', self.url, data=data, headers=self.headers)   
-
-        return r.json()
+        return r
 
     def get_workspace(self):
 

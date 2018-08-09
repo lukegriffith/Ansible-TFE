@@ -9,9 +9,11 @@ def main():
         'Demo-Infrastructure'
     )
 
-    b = a.get_workspace()
+    b = a.create_workspace()
 
-    print(json.dumps(b.json()))
+    print(b.json())
+
+    print(a.post_payload)
 
 
 
