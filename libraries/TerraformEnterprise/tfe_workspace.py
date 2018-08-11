@@ -59,67 +59,6 @@ message:
     description: The output message that the sample module generates
 '''
 
-from requests import Request
-import requests
-import json
-
-class api():
-    def __init__(self, token, workspace_name, organization, **kwargs):
-
-        self.token = token
-        self.workspace_name = workspace_name
-        self.kwargs = kwargs
-        self.url = 'https://app.terraform.io/api/v2/organizations/{}/workspaces'.format(organization)
-
-        self.headers =  {
-            'Authorization': 'Bearer {}'.format(self.token),
-            'content-type': 'application/vnd.api+json'
-        }
-
-
-    def format_post_payload(self):
-
-        self.post_payload = {
-            'data': {
-                'type': 'workspaces',
-                'attributes': {
-                    'name': self.workspace_name
-                }
-            }
-        }
-
-        if 'auto_apply' in self.kwargs:
-            self.post_payload['data']['attributes']['auto_apply'] = self.kwargs['auto_apply']
-
-        if 'terraform_version' in self.kwargs and self.kwargs['terraform_version'] != None:
-            self.post_payload['data']['attributes']['terraform-version'] = self.kwargs['terraform_version']
-
-        if 'vcs_repo' in self.kwargs:
-
-            if 'vcs_oauth_token' not in self.kwargs:
-                raise Exception(
-                    'vcs outh token needs to be specified if providing vcs_repo'
-                )
-
-            self.post_payload['data']['attributes']['vcs-repo'] = {
-                'identifier': self.kwargs['vcs_repo'],
-                'branch': self.kwargs['vcs_branch'],
-                'ingress-submodules': self.kwargs['vcs_ingress_submodules'],
-                'oauth-token-id': self.kwargs['vcs_oauth_token']
-            }
-
-    def create_workspace(self):
-
-        self.format_post_payload()
-        r = requests.post(self.url, data=json.dumps(self.post_payload), headers=self.headers)   
-
-        return r
-
-    def get_workspace(self):
-
-        r = requests.get(self.url, headers=self.headers)
-
-        return r
 
 
 def run_module():
