@@ -5,8 +5,16 @@ class base():
 
         self.token = token
         self.url = 'https://app.terraform.io/api/v2/organizations/{}/{}'.format(organization, endpoint)
+        self.organization = organization
 
         self.headers =  {
             'Authorization': 'Bearer {}'.format(self.token),
             'content-type': 'application/vnd.api+json'
         }
+
+
+
+class ResourceNotFoundException(Exception):
+    pass
+
+

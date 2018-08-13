@@ -1,6 +1,6 @@
 import requests
 import json
-from api import base
+from api import base, ResourceNotFoundException
 
 class workspace(base):
     def __init__(self, token, workspace_name, organization, **kwargs):
@@ -33,7 +33,6 @@ class workspace(base):
                 raise Exception(
                     'vcs outh token needs to be specified if providing vcs_repo'
                 )
-
             self.post_payload['data']['attributes']['vcs-repo'] = {
                 'identifier': self.kwargs['vcs_repo'],
                 'branch': self.kwargs['vcs_branch'],
@@ -57,7 +56,7 @@ class workspace(base):
                 if w['attributes']['name'] == self.workspace_name:
                     return w
         else:
-            return None
+            raise ResourceNotFoundException('Cant find workspace')
 
 
 class workspace_var(base):
@@ -73,11 +72,10 @@ class workspace_var(base):
         w = thisWorkspace.get_workspace()
 
         if w == None:
-            raise Exception("Workspace does not exist.")
+            raise ResourceNotFoundException("Workspace does not exist.")
 
         self.workspace_id = w['id']
         self.workspace_name = workspace_name
-        self.organization = organization
         self.variable_name = variable_name
         self.variable_value = variable_value
         self.env = env
@@ -132,4 +130,101 @@ class workspace_var(base):
 
             return v
 
-        return None
+        raise ResourceNotFoundException('Cant find variable.')
+
+
+class team(base):
+    def __init__(self, token, team_name, organization):
+        base.__init__(self, token, organization, 'teams')
+        self.team_name = team_name
+
+    def format_post_payload(self):
+        self.post_payload = {
+            "data": {
+                "type": "teams",
+                "attributes": {
+                    "name": self.team_name
+                }
+            }
+        }
+
+    def create_team(self):
+        self.format_post_payload()
+        r = requests.post(self.url, data=json.dumps(self.post_payload), headers=self.headers)
+        return r.json()
+
+    def get_team(self):
+        r = requests.get(self.url, headers=self.headers)
+        data = r.json()
+
+        for t in data['data']:
+            if t['attributes']['name'] == self.team_name:
+                return t
+        raise ResourceNotFoundException('Cant find team.')
+
+
+
+class team_access(base):
+    def __init__(self, token, team_id, workspace_id, access):
+        base.__init__(self, token, 'org', 'teams')
+        
+        if access not in ['read', 'write', 'admin']:
+            raise Exception('Access value not valid. Should be read, write or admin.')
+
+        # url is different than normal format.
+        self.url = 'https://app.terraform.io/api/v2/team-workspaces'
+        self.team_id = team_id
+        self.workspace_id = workspace_id
+        self.access = access
+
+    def format_post_payload(self):
+
+        self.post_payload = {
+            "data": {
+                "attributes": {
+                "access": self.access
+                },
+                "relationships": {
+                "workspace": {
+                    "data": {
+                    "type": "workspaces",
+                    "id": self.workspace_id
+                    }
+                },
+                "team": {
+                    "data": {
+                    "type": "teams",
+                    "id": self.team_id
+                    }
+                }
+                },
+                "type": "team-workspaces"
+            }
+            }
+
+    def create_team_access(self):
+        
+        self.format_post_payload()
+
+        r = requests.post(url=self.url, data=json.dumps(self.post_payload), headers=self.headers)
+
+        return r.json()
+
+
+    def get_team_access(self):
+
+        get_data = {
+            "filter[workspace][id]": self.workspace_id
+        }
+
+        r = requests.get(self.url, params=get_data, headers=self.headers)
+        data = r.json()
+
+        for t_a in data['data']:
+            team_id = t_a['relationships']['team']['data']['id']
+            workspace_id = t_a['relationships']['workspace']['data']['id']
+
+            if workspace_id == self.workspace_id and team_id == self.team_id:
+                return t_a
+
+        raise ResourceNotFoundException('Unable to find team access grant.')
