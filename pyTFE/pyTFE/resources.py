@@ -58,6 +58,11 @@ class workspace(base):
         else:
             raise ResourceNotFoundException('Cant find workspace')
 
+    def delete_workspace(self):
+
+        url = self.url + "/" + self.workspace_name
+        r = requests.delete(url, headers=self.headers)
+        return r.json()
 
 class workspace_var(base):
     def __init__(self, token, workspace_name, organization, variable_name, 
@@ -71,8 +76,6 @@ class workspace_var(base):
         thisWorkspace = workspace(token, workspace_name, organization)
         w = thisWorkspace.get_workspace()
 
-        if w == None:
-            raise ResourceNotFoundException("Workspace does not exist.")
 
         self.workspace_id = w['id']
         self.workspace_name = workspace_name

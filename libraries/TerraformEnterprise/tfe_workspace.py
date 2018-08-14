@@ -74,7 +74,8 @@ def run_module():
         vcs_repo=dict(type='str', required=False, default=None),
         vcs_oauth_token=dict(type='str', required=False, default=None),
         vcs_branch=dict(type='str', required=False, default='master'),
-        vcs_ingress_submodules=dict(type='str', required=False, default=False)
+        vcs_ingress_submodules=dict(type='str', required=False, default=False),
+        absent=dict(type='bool', required=False, default=False)
 
     )
 
@@ -98,30 +99,68 @@ def run_module():
         supports_check_mode=True
     )
 
+    extra_params = {}
+
+    for key in ['auto_apply','terraform_version',
+        'vcs_repo', 'vcs_branch', 'vcs_ingress_submodules',
+        'vcs_oauth_token']:
+        if  key in module.params:
+            extra_params[key] = module.params[key]
+
+    wks = workspace(
+        token=module.params['token'],
+        workspace_name=module.params['workspace_name'],
+        organization=module.params['organization'],
+        **extra_params
+    )
+
+    module.params['compliant'] = True
+
+    try: 
+        result = wks.get_workspace()
+
+    except ResourceNotFoundException:
+        if module.params['absent'] == False:
+            result['message'] = 'Workspace not found'
+            result['compliant'] = False
+        else:
+            result['message'] = 'Workspace not found, and expected absent'
+            result['compliant'] = True
+
+    except Exception as e:
+        module.fail_json(msg='General error occured: ' + e, **result)
+
+    if module.params['absent']:
+        result['message'] = 'Workspace found, but expected absent'
+        result['compliant'] = False
+
     # if the user is working with this module in only check mode we do not
     # want to make any changes to the environment, just return the current
     # state with no modifications
     if module.check_mode:
         return result
 
-    # manipulate or modify the state as needed (this is going to be the
-    # part where your module will do what it needs to do)
-    result['original_message'] = module.params['name']
-    result['message'] = 'goodbye'
 
-    # use whatever logic you need to determine whether or not this module
-    # made any modifications to your target
-    if module.params['new']:
+    if not result['compliant']:
+
+        if module.params['absent']:
+
+            try: 
+                wks.delete_workspace()
+                result['message'] = 'Workspace deleted'
+            except Exception as e:
+                result['changed'] = True
+                module.fail_json(msg='General error occured: ' + e, **result)
+        else:
+            try:
+                wks.create_workspace()
+                result['message'] = 'Workspace created'
+            except Exception as e:
+                result['changed'] = True
+                module.fail_json(msg='General error occured: ' + e, **result)
+
         result['changed'] = True
 
-    # during the execution of the module, if there is an exception or a
-    # conditional state that effectively causes a failure, run
-    # AnsibleModule.fail_json() to pass in the message and the result
-    if module.params['name'] == 'fail me':
-        module.fail_json(msg='You requested this to fail', **result)
-
-    # in the event of a successful module execution, you will want to
-    # simple AnsibleModule.exit_json(), passing the key/value results
     module.exit_json(**result)
 
 def main():
@@ -129,4 +168,6 @@ def main():
 
 if __name__ == '__main__':
     from ansible.module_utils.basic import AnsibleModule
-    main()
+    from pyTFE.resources import workspace
+    from pyTFE.api import ResourceNotFoundException
+    main()  
